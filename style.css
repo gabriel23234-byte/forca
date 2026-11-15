@@ -1,0 +1,21 @@
+body[data-tema="classico"] {
+    --cor-fundo: #1e1e2e;
+    --cor-primaria: #89b4fa;
+    --cor-texto: #ffffff;
+}
+body[data-tema="halloween"] {
+    --cor-fundo: #1a0f0a;
+    --cor-primaria: #ff7518;
+    --cor-texto: #ffd699;
+}
+body[data-tema="neon"] {
+    --cor-fundo: #050505;
+    --cor-primaria: #00ffcc;
+    --cor-texto: #e0e0e0;
+}
+
+body {
+    background: var(--cor-fundo);
+    color: var(--cor-texto);
+}
+button { background: var(--cor-primaria); }

@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Forca 1v1</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+        /* ===== Variáveis de tema (padrão: clássico) ===== */
+        body[data-tema="classico"]  { --bg: #1e1e2e; --primaria: #89b4fa; --texto: #ffffff; --card: #2a2a3e; }
+        body[data-tema="halloween"] { --bg: #1a0f0a; --primaria: #ff7518; --texto: #ffd699; --card: #2d1a10; }
+        body[data-tema="neon"]      { --bg: #050505; --primaria: #00ffcc; --texto: #e0e0e0; --card: #111111; }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: Arial, sans-serif; }
+
+        body {
+            background: var(--bg);
+            color: var(--texto);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .screen {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+            background: var(--card);
+            padding: 40px;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 400px;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        input {
+            padding: 10px;
+            border-radius: 8px;
+            border: none;
+            width: 100%;
+            font-size: 16px;
+        }
+
+        button {
+            background: var(--primaria);
+            color: #111;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            width: 100%;
+        }
+
+        button:hover { opacity: 0.85; }
+
+        /* Modal da sala */
+        #roomModal {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.7);
+            display: none;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .temas { display: flex; gap: 10px; }
+
+        .tema-visual-btn {
+            width: 60px;
+            height: 60px;
+            border-radius: 10px;
+            border: 3px solid transparent;
+            cursor: pointer;
+        }
+
+        .tema-visual-btn.selecionado { border-color: #fff; }
+
+        #temaClassico  { background: #89b4fa; }
+        #temaHalloween { background: #ff7518; }
+        #temaNeon      { background: #00ffcc; }
+
+        .categorias {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 8px;
+            width: 100%;
+        }
+
+        .categoria-btn {
+            padding: 10px 6px;
+            font-size: 13px;
+        }
+
+        .categoria-btn.selecionado { outline: 3px solid #fff; }
+
+        /* Tela do jogo */
+        #letraInput { width: 80px; text-align: center; text-transform: uppercase; }
+        #statusJogo { font-size: 18px; min-height: 24px; }
+    </style>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body data-tema="classico">
+
+    <!-- ===== TELA 1: PERFIL ===== -->
+    <div class="screen" id="profileScreen" style="display:flex;">
+        <h1>🪢 Forca 1v1</h1>
+        <input type="text" id="nicknameInput" placeholder="Seu apelido" maxlength="15">
+        <button onclick="criarPerfil()">Continuar</button>
+    </div>
+
+    <!-- ===== TELA 2: MODAL DA SALA ===== -->
+    <div id="roomModal">
+        <div class="screen" style="display:flex;">
+            <h2>Criar sala</h2>
+            <p>Escolha o tema visual:</p>
+            <div class="temas">
+                <div class="tema-visual-btn selecionado" id="temaClassico" data-tema="classico" onclick="escolherTemaVisual('classico')"></div>
+                <div class="tema-visual-btn" id="temaHalloween" data-tema="halloween" onclick="escolherTemaVisual('halloween')"></div>
+                <div class="tema-visual-btn" id="temaNeon" data-tema="neon" onclick="escolherTemaVisual('neon')"></div>
+            </div>
+            <p>Escolha a categoria de palavras:</p>
+            <div class="categorias">
+                <button class="categoria-btn" data-categoria="animais" onclick="escolherTema('animais')">Animais</button>
+                <button class="categoria-btn" data-categoria="frutas" onclick="escolherTema('frutas')">Frutas e alimentos</button>
+                <button class="categoria-btn" data-categoria="paises" onclick="escolherTema('paises')">Países e capitais</button>
+                <button class="categoria-btn" data-categoria="profissoes" onclick="escolherTema('profissoes')">Profissões</button>
+                <button class="categoria-btn" data-categoria="filmes" onclick="escolherTema('filmes')">Filmes e séries</button>
+                <button class="categoria-btn" data-categoria="objetos" onclick="escolherTema('objetos')">Objetos</button>
+                <button class="categoria-btn" data-categoria="cores" onclick="escolherTema('cores')">Cores</button>
+                <button class="categoria-btn" data-categoria="esportes" onclick="escolherTema('esportes')">Esportes</button>
+                <button class="categoria-btn" data-categoria="desenhos" onclick="escolherTema('desenhos')">Desenhos e animes</button>
+                <button class="categoria-btn" data-categoria="marcas" onclick="escolherTema('marcas')">Marcas e empresas</button>
+            </div>
+            <p>Categoria selecionada: <span id="temaEscolhidoLabel">nenhuma</span></p>
+            <button onclick="criarSala()">Criar sala</button>
+            <p>Já tem um ID de sala?</p>
+            <input type="text" id="joinRoomInput" placeholder="ID da sala" maxlength="6" autocomplete="off">
+            <button onclick="entrarSala()">Entrar em uma sala</button>
+        </div>
+    </div>
+
+    <!-- ===== TELA 3: JOGO ===== -->
+    <div class="screen" id="gameScreen">
+        <h2>Sala: <span id="idSalaTela"></span></h2>
+        <p>Categoria: <span id="temaSalaTela"></span></p>
+        <p id="jogadoresTela"></p>
+        <p id="statusJogo">Aguardando oponente...</p>
+        <div id="definirPalavraBox" style="display:none; width:100%;">
+            <p>Como criador da sala, defina a palavra secreta:</p>
+            <input type="text" id="palavraInput" placeholder="Palavra secreta" maxlength="30" autocomplete="off">
+            <button onclick="definirPalavra()">Definir palavra</button>
+        </div>
+        <div style="display:flex; gap:10px;">
+            <input type="text" id="letraInput" maxlength="1" placeholder="A" disabled>
+            <button id="chutarButton" onclick="chutar()" style="width:auto;" disabled>Chutar</button>
+        </div>
+        <p id="letrasUsadas"></p>
+    </div>
+
+    <script src="/script.js"></script>
+</body>
+</html>
