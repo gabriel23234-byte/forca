@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Forca Multiplayer</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <link rel="stylesheet" href="/style.css">
+</head>
+
+<body data-tema="classico">
+
+    <!-- ===== TELA 1: PERFIL ===== -->
+    <div class="screen" id="profileScreen" style="display:flex;">
+        <h1>🪢 Jogo da Forca</h1>
+        <p class="subtitulo">Escolha seu apelido para criar ou entrar em uma sala</p>
+        <input type="text" id="nicknameInput" placeholder="Seu apelido" maxlength="15" autocomplete="off">
+        <button onclick="criarPerfil()">Continuar</button>
+    </div>
+
+    <!-- ===== TELA 2: MODAL DA SALA ===== -->
+    <div id="roomModal">
+        <div class="screen modal-card" style="display:flex;">
+            <h2>Configurar Sala</h2>
+
+            <p class="label-secao">Tema visual:</p>
+            <div class="temas">
+                <button type="button" class="tema-visual-btn selecionado" id="temaClassico" data-tema="classico"
+                    title="Clássico" onclick="escolherTemaVisual('classico')"></button>
+                <button type="button" class="tema-visual-btn" id="temaHalloween" data-tema="halloween" title="Halloween"
+                    onclick="escolherTemaVisual('halloween')"></button>
+                <button type="button" class="tema-visual-btn" id="temaNeon" data-tema="neon" title="Neon"
+                    onclick="escolherTemaVisual('neon')"></button>
+            </div>
+
+            <p class="label-secao">Categoria da palavra:</p>
+            <div class="categorias">
+                <button type="button" class="categoria-btn" data-categoria="animais"
+                    onclick="escolherTema('animais')">Animais</button>
+                <button type="button" class="categoria-btn" data-categoria="frutas"
+                    onclick="escolherTema('frutas')">Frutas</button>
+                <button type="button" class="categoria-btn" data-categoria="paises"
+                    onclick="escolherTema('paises')">Países e Capitais</button>
+                <button type="button" class="categoria-btn" data-categoria="profissoes"
+                    onclick="escolherTema('profissoes')">Profissões</button>
+                <button type="button" class="categoria-btn" data-categoria="comidas"
+                    onclick="escolherTema('comidas')">Comidas e Pratos Típicos</button>
+                <button type="button" class="categoria-btn" data-categoria="filmes"
+                    onclick="escolherTema('filmes')">Filmes, Séries e Animes</button>
+                <button type="button" class="categoria-btn" data-categoria="jogos" onclick="escolherTema('jogos')">Jogos
+                    Eletrônicos e Tabuleiro</button>
+                <button type="button" class="categoria-btn" data-categoria="esportes"
+                    onclick="escolherTema('esportes')">Esportes</button>
+                <button type="button" class="categoria-btn" data-categoria="objetos"
+                    onclick="escolherTema('objetos')">Objetos do Dia a Dia</button>
+                <button type="button" class="categoria-btn" data-categoria="natureza"
+                    onclick="escolherTema('natureza')">Cores, Plantas ou Minerais</button>
+            </div>
+            <p class="categoria-atual">Categoria: <strong id="temaEscolhidoLabel">nenhuma</strong></p>
+
+            <input type="text" id="palavraSecretaInput" placeholder="Palavra secreta (ex: cachorro ou rio de janeiro)"
+                maxlength="30" autocomplete="off">
+
+            <select id="maxAdivInput">
+                <option value="1">1 adivinhador</option>
+                <option value="2" selected>2 adivinhadores</option>
+                <option value="3">3 adivinhadores</option>
+                <option value="4">4 adivinhadores</option>
+            </select>
+
+            <button type="button" onclick="criarSala()">Criar sala</button>
+
+            <div class="divisor"><span>ou</span></div>
+
+            <input type="text" id="joinRoomInput" placeholder="ID da sala (ex: A7B3K9)" maxlength="6"
+                autocomplete="off">
+            <button type="button" class="btn-secundario" onclick="entrarSala()">Entrar em uma sala</button>
+        </div>
+    </div>
+
+    <!-- ===== TELA 3: JOGO ===== -->
+    <div class="screen game-card" id="gameScreen">
+        <div class="topo-sala">
+            <div>
+                <h2>Sala: <span id="idSalaTela"></span></h2>
+                <p class="info-meta">Categoria: <strong id="temaSalaTela"></strong></p>
+            </div>
+            <div class="tempo-box">⏱️ <span id="tempoTela">15s</span></div>
+        </div>
+
+        <p id="jogadoresTela" class="info-meta"></p>
+        <p id="statusJogo">Aguardando...</p>
+
+        <!-- SVG DA FORCA (6 partes: erro 1 a 6) -->
+        <div class="forca-container">
+            <svg id="forcaSvg" viewBox="0 0 180 190" width="170" height="180" aria-label="Desenho da forca">
+                <!-- Estrutura da forca -->
+                <line x1="20" y1="175" x2="110" y2="175" class="forca-estrutura" />
+                <line x1="55" y1="175" x2="55" y2="20" class="forca-estrutura" />
+                <line x1="55" y1="20" x2="125" y2="20" class="forca-estrutura" />
+                <line x1="125" y1="20" x2="125" y2="45" class="forca-estrutura" />
+
+                <!-- 1. Cabeça -->
+                <circle cx="125" cy="63" r="18" class="parte-corpo" data-erro="1" />
+                <!-- 2. Tronco -->
+                <line x1="125" y1="81" x2="125" y2="125" class="parte-corpo" data-erro="2" />
+                <!-- 3. Braço esquerdo -->
+                <line x1="125" y1="92" x2="102" y2="112" class="parte-corpo" data-erro="3" />
+                <!-- 4. Braço direito -->
+                <line x1="125" y1="92" x2="148" y2="112" class="parte-corpo" data-erro="4" />
+                <!-- 5. Perna esquerda -->
+                <line x1="125" y1="125" x2="105" y2="155" class="parte-corpo" data-erro="5" />
+                <!-- 6. Perna direita -->
+                <line x1="125" y1="125" x2="145" y2="155" class="parte-corpo" data-erro="6" />
+            </svg>
+            <span id="errosTela">Erros: 0/6</span>
+        </div>
+
+        <div id="palavraTela"></div>
+
+        <div class="chute-area">
+            <input type="text" id="letraInput" maxlength="1" placeholder="A" autocomplete="off" disabled>
+            <button id="chutarButton" onclick="chutar()" disabled>Chutar</button>
+        </div>
+
+        <div class="letras-box">
+            <span>Letras usadas:</span>
+            <p id="letrasUsadas">—</p>
+        </div>
+
+        <!-- Painel exibido ao fim da partida (vitória ou derrota) -->
+        <div id="fimPartidaBox" class="fim-partida-box">
+            <div id="controlesAnfitriaoFim" style="display:none; width:100%; flex-direction:column; gap:10px;">
+                <input type="text" id="novaPalavraInput" placeholder="Nova palavra secreta..." maxlength="30"
+                    autocomplete="off">
+                <div class="acoes-fim">
+                    <button type="button" id="btnNovoJogo" onclick="prepararNovaRodada()">🔄 Novo jogo</button>
+                    <button type="button" id="btnEncerrarJogo" class="btn-perigo" onclick="encerrarSala()">🛑 Encerrar
+                        jogo</button>
+                </div>
+            </div>
+            <p id="avisoFimAdivinhador" class="info-meta" style="display:none;">
+                Aguardando o anfitrião iniciar um novo jogo ou encerrar a sala...
+            </p>
+        </div>
+
+        <button id="btnIniciar" onclick="iniciarJogo()" style="display:none;">▶ Iniciar partida</button>
+
+        <div id="chatDicas"></div>
+        <div class="dica-area">
+            <input id="dicaInput" placeholder="Dica para os adivinhadores..." autocomplete="off" disabled>
+            <button id="btnEnviarDica" onclick="enviarDica()" disabled>Enviar</button>
+        </div>
+    </div>
+
+    <script src="/script.js"></script>
+</body>
+
+</html>
