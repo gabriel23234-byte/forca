@@ -8,15 +8,11 @@ const app = express();
 const PORT = 3001;
 
 const server = http.createServer(app);
-const io = new Server(server, {
-    cors: {
-        origin: '*',
-        methods: ['GET', 'POST']
-    }
-});
+const io = new Server(server, { cors: { origin: '*', methods: ['GET', 'POST'] } });
 
 app.use(cors());
 app.use(express.json());
+
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
@@ -26,161 +22,264 @@ app.get('/script.js', (req, res) => {
 app.get('/style.css', (req, res) => {
     res.sendFile(path.join(__dirname, 'style.css'));
 });
-app.use(express.static('public'));
 
-// ===== Estado dos jogos em memória =====
+const TEMPO_LIMITE = 15000; // 15s por jogada
 const salas = {};
-const categoriasPalavras = {
-    animais: ['elefante', 'gato', 'girafa', 'tartaruga', 'jacare'],
-    frutas: ['abacaxi', 'melancia', 'chocolate', 'lasanha', 'miojo'],
-    paises: ['brasil', 'japao', 'argentina', 'madri', 'ottawa'],
-    profissoes: ['engenheiro', 'professor', 'dentista', 'bombeiro', 'advogado'],
-    filmes: ['titanic', 'batman', 'friends', 'shrek', 'matrix'],
-    objetos: ['geladeira', 'caderno', 'telefone', 'abajur', 'chinelo'],
-    cores: ['vermelho', 'turquesa', 'amarelo', 'lilas', 'marrom'],
-    esportes: ['futebol', 'basquete', 'natacao', 'volei', 'rugby'],
-    desenhos: ['naruto', 'pokemon', 'simpsons', 'scooby', 'doraemon'],
-    marcas: ['nike', 'coca', 'google', 'netflix', 'spotify']
-};
-const temasVisuais = ['classico', 'halloween', 'neon'];
 
-// ===== Lógica do jogo da forca 1v1 =====
+// ==================== HELPERS ====================
+function normalizarPalavra(texto) {
+    return texto
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+function broadcastEstado(sala) {
+    const s = salas[sala];
+    if (!s) return null;
+
+    const letrasDaPalavra = s.palavra.split('').filter((ch) => ch !== ' ');
+    const palavraMascarada = s.palavra
+        .split('')
+        .map((ch) => {
+            if (ch === ' ') return '\u00A0\u00A0';
+            return s.letrasUsadas.includes(ch) ? ch : '_';
+        })
+        .join(' ');
+
+    const acabou = s.erros >= s.maxErros;
+    const ganhou = letrasDaPalavra.length > 0 && letrasDaPalavra.every((l) => s.letrasUsadas.includes(l));
+
+    if (acabou || ganhou) {
+        s.emAndamento = false;
+        clearTimeout(s.timer);
+    }
+
+    const estado = {
+        letrasUsadas: s.letrasUsadas,
+        erros: s.erros,
+        maxErros: s.maxErros,
+        palavraMascarada,
+        acabou,
+        ganhou,
+        vezDe: s.adivinhadores[s.vez]?.apelido || null,
+        vezId: s.adivinhadores[s.vez]?.id || null
+    };
+
+    if (acabou || ganhou) {
+        estado.palavra = s.palavra;
+    }
+
+    io.to(sala).emit('estadoAtualizado', estado);
+    return estado;
+}
+
+function passarVez(sala) {
+    const s = salas[sala];
+    if (!s || !s.emAndamento || s.adivinhadores.length === 0) return;
+    clearTimeout(s.timer);
+    s.vez = (s.vez + 1) % s.adivinhadores.length;
+    iniciarTemporizador(sala);
+}
+
+function iniciarTemporizador(sala) {
+    const s = salas[sala];
+    if (!s || !s.emAndamento || s.adivinhadores.length === 0) return;
+
+    clearTimeout(s.timer);
+    const atual = s.adivinhadores[s.vez];
+    if (!atual) return;
+
+    io.to(sala).emit('vezDoJogador', {
+        id: atual.id,
+        apelido: atual.apelido,
+        tempo: TEMPO_LIMITE / 1000
+    });
+
+    s.timer = setTimeout(() => {
+        if (!s.emAndamento) return;
+        s.erros++;
+        io.to(sala).emit('fimDeTempo', { apelido: atual.apelido });
+        const estado = broadcastEstado(sala);
+        if (estado && !estado.acabou && !estado.ganhou) {
+            passarVez(sala);
+        }
+    }, TEMPO_LIMITE);
+}
+
+function emitJogadores(sala) {
+    const s = salas[sala];
+    if (!s) return;
+    io.to(sala).emit('jogadoresAtualizados', {
+        anfitriao: s.anfitriao.apelido,
+        adivinhadores: s.adivinhadores.map((a) => a.apelido),
+        faltam: s.maxAdivinhadores - s.adivinhadores.length
+    });
+}
+
+// ==================== CONEXÃO ====================
 io.on('connection', (socket) => {
-    console.log('Jogador conectado:', socket.id);
+    console.log('Conectado:', socket.id);
 
-    // Entrar numa sala (máx. 2 jogadores)
-    socket.on('entrarSala', (dados = {}) => {
-        const { sala, apelido, tema, categoria, acao } = dados;
-        if (typeof sala !== 'string' || !sala.trim() || typeof apelido !== 'string' || !apelido.trim()) {
-            return socket.emit('erro', 'Informe o ID da sala e seu apelido.');
-        }
+    socket.on('criarSala', ({ apelido, tema, palavra, maxAdivinhadores }) => {
+        const apelidoLimpo = (apelido || '').trim();
+        const palavraLimpa = normalizarPalavra(palavra || '');
+        const max = parseInt(maxAdivinhadores, 10);
 
-        const salaId = acao ? sala.trim().toUpperCase() : sala;
-        if (acao === 'entrar' && !salas[salaId]) {
-            return socket.emit('salaNaoEncontrada');
+        if (!apelidoLimpo) return socket.emit('erro', 'Apelido inválido!');
+        if (!palavraLimpa || !/^[a-z\s]+$/.test(palavraLimpa)) {
+            return socket.emit('erro', 'Digite uma palavra válida (apenas letras, sem números ou símbolos)!');
         }
-        if (acao === 'criar' && salas[salaId]) {
-            return socket.emit('erro', 'Este ID de sala já existe. Tente criar outra sala.');
-        }
-        if (acao === 'criar' && !Object.prototype.hasOwnProperty.call(categoriasPalavras, categoria)) {
-            return socket.emit('erro', 'Escolha uma categoria válida.');
+        if (!tema) return socket.emit('erro', 'Tema é obrigatório!');
+        if (isNaN(max) || max < 1 || max > 4) {
+            return socket.emit('erro', 'Escolha entre 1 e 4 adivinhadores!');
         }
 
-        if (!salas[salaId]) {
-            const palavras = categoriasPalavras[categoria];
-            const palavra = palavras
-                ? palavras[Math.floor(Math.random() * palavras.length)]
-                : '';
-            salas[salaId] = {
-                jogadores: [],
-                palavra,
-                letrasUsadas: [],
-                erros: 0,
-                maxErros: 6,
-                vez: 0,
-                tema: temasVisuais.includes(tema) ? tema : 'classico',
-                categoria: palavras ? categoria : null
-            };
-        }
-        const s = salas[salaId];
+        let salaId;
+        do {
+            salaId = gerarIdSala();
+        } while (salas[salaId]);
 
-        if (s.jogadores.length >= 2) {
-            return socket.emit('salaCheia');
-        }
+        salas[salaId] = {
+            anfitriao: { id: socket.id, apelido: apelidoLimpo },
+            tema,
+            palavra: palavraLimpa,
+            adivinhadores: [],
+            maxAdivinhadores: max,
+            letrasUsadas: [],
+            erros: 0,
+            maxErros: 6,
+            vez: 0,
+            timer: null,
+            emAndamento: false
+        };
 
         socket.join(salaId);
         socket.data.sala = salaId;
-        s.jogadores.push({ id: socket.id, apelido: apelido.trim() });
+        socket.data.papel = 'anfitriao';
 
-        socket.emit('permissaoDefinirPalavra', {
-            podeDefinir: s.jogadores[0].id === socket.id,
-            palavraDefinida: Boolean(s.palavra)
+        socket.emit('salaCriada', { id: salaId, tema, maxAdivinhadores: max });
+        emitJogadores(salaId);
+        broadcastEstado(salaId);
+    });
+
+    socket.on('entrarSala', ({ sala, apelido }) => {
+        const codigo = (sala || '').trim().toUpperCase();
+        const apelidoLimpo = (apelido || '').trim();
+        const s = salas[codigo];
+
+        if (!apelidoLimpo) return socket.emit('erro', 'Apelido inválido!');
+        if (!s) return socket.emit('erro', 'Sala não encontrada!');
+        if (s.adivinhadores.length >= s.maxAdivinhadores) return socket.emit('erro', 'Sala cheia!');
+        if (s.emAndamento) return socket.emit('erro', 'Partida já em andamento!');
+
+        socket.join(codigo);
+        socket.data.sala = codigo;
+        socket.data.papel = 'adivinhador';
+        s.adivinhadores.push({ id: socket.id, apelido: apelidoLimpo });
+
+        socket.emit('salaEntrou', {
+            id: codigo,
+            tema: s.tema,
+            maxAdivinhadores: s.maxAdivinhadores
         });
-        io.to(salaId).emit('aplicarTema', { tema: s.tema });
-        io.to(salaId).emit('jogadoresAtualizados', s.jogadores.map(j => j.apelido));
-        io.to(salaId).emit('salaInfo', {
-            id: salaId,
-            tema: s.categoria,
-            categoria: s.categoria,
-            temaVisual: s.tema,
-            jogadores: s.jogadores.map(j => j.apelido)
+
+        emitJogadores(codigo);
+        broadcastEstado(codigo);
+    });
+
+    socket.on('iniciarJogo', () => {
+        const sala = socket.data.sala;
+        const s = salas[sala];
+        if (!s || s.anfitriao.id !== socket.id) return socket.emit('erro', 'Só o anfitrião inicia!');
+        if (s.adivinhadores.length === 0) return socket.emit('erro', 'Precisa de pelo menos 1 adivinhador!');
+
+        s.emAndamento = true;
+        s.erros = 0;
+        s.letrasUsadas = [];
+        s.vez = 0;
+
+        io.to(sala).emit('partidaIniciada');
+        broadcastEstado(sala);
+        iniciarTemporizador(sala);
+    });
+
+    socket.on('chutarLetra', ({ letra }) => {
+        const sala = socket.data.sala;
+        const s = salas[sala];
+        if (!s || !s.emAndamento) return;
+
+        const atual = s.adivinhadores[s.vez];
+        if (!atual || atual.id !== socket.id) return socket.emit('erro', 'Não é sua vez!');
+
+        const limpa = normalizarPalavra(letra || '');
+        if (!/^[a-z]$/.test(limpa)) return socket.emit('erro', 'Digite uma única letra válida!');
+        if (s.letrasUsadas.includes(limpa)) return socket.emit('erro', 'Letra já usada!');
+
+        s.letrasUsadas.push(limpa);
+        if (!s.palavra.includes(limpa)) {
+            s.erros++;
+        }
+
+        const estado = broadcastEstado(sala);
+        if (estado && !estado.acabou && !estado.ganhou) {
+            passarVez(sala);
+        }
+    });
+
+    socket.on('enviarDica', ({ dica }) => {
+        const sala = socket.data.sala;
+        const s = salas[sala];
+        if (!s || s.anfitriao.id !== socket.id) return socket.emit('erro', 'Só o anfitrião envia dicas!');
+        const texto = (dica || '').trim();
+        if (!texto) return;
+
+        io.to(sala).emit('novaDica', {
+            de: s.anfitriao.apelido,
+            texto,
+            hora: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
         });
-
-        if (s.jogadores.length === 2) {
-            io.to(salaId).emit('iniciarPartida', { vezDe: s.jogadores[0].apelido });
-        }
     });
 
-    // Um dos jogadores define a palavra secreta
-    socket.on('definirPalavra', ({ sala, palavra }) => {
-        const s = salas[sala];
-        if (!s) {
-            return socket.emit('erro', 'Sala não encontrada.');
-        }
-        if (s.jogadores[0].id !== socket.id) {
-            return socket.emit('erro', 'Somente quem criou a sala pode definir a palavra.');
-        }
-        if (s.palavra) {
-            return socket.emit('erro', 'A palavra secreta já foi definida.');
-        }
-
-        const palavraNormalizada = typeof palavra === 'string' ? palavra.trim().toLowerCase() : '';
-        if (!palavraNormalizada) {
-            return socket.emit('erro', 'Digite uma palavra secreta.');
-        }
-
-        s.palavra = palavraNormalizada;
-        io.to(sala).emit('palavraDefinida');
-    });
-
-    // Jogador da vez chuta uma letra
-    socket.on('chutarLetra', ({ sala, letra }) => {
-        const s = salas[sala];
-        if (!s || s.jogadores.length < 2) return;
-        if (!s.palavra) {
-            return socket.emit('erro', 'A palavra secreta ainda não foi definida.');
-        }
-
-        const jogadorAtual = s.jogadores[s.vez];
-        if (jogadorAtual.id !== socket.id) {
-            return socket.emit('erro', 'Não é sua vez!');
-        }
-        if (s.letrasUsadas.includes(letra)) {
-            return socket.emit('erro', 'Letra já usada!');
-        }
-
-        s.letrasUsadas.push(letra);
-        if (!s.palavra.includes(letra)) s.erros++;
-
-        const ganhou = s.palavra.split('').every(l => s.letrasUsadas.includes(l));
-        const perdeu = s.erros >= s.maxErros;
-        if (!perdeu && !ganhou) {
-            s.vez = (s.vez + 1) % 2;
-        }
-
-        const estado = {
-            letrasUsadas: s.letrasUsadas,
-            erros: s.erros,
-            vezDe: s.jogadores[s.vez].apelido,
-            perdeu,
-            ganhou
-        };
-        if (perdeu || ganhou) {
-            estado.palavra = s.palavra;
-        }
-        io.to(sala).emit('estadoAtualizado', estado);
-    });
-
-    // Jogador desconectou
     socket.on('disconnect', () => {
         const sala = socket.data.sala;
-        if (sala && salas[sala]) {
-            socket.to(sala).emit('oponenteSaiu');
+        if (!sala || !salas[sala]) return;
+        const s = salas[sala];
+
+        if (socket.data.papel === 'anfitriao') {
+            clearTimeout(s.timer);
+            io.to(sala).emit('salaEncerrada');
             delete salas[sala];
+        } else {
+            const quemSaiuEraDaVez = s.adivinhadores[s.vez]?.id === socket.id;
+            s.adivinhadores = s.adivinhadores.filter((a) => a.id !== socket.id);
+
+            if (s.adivinhadores.length === 0) {
+                s.emAndamento = false;
+                clearTimeout(s.timer);
+            } else if (s.emAndamento) {
+                if (s.vez >= s.adivinhadores.length) {
+                    s.vez = 0;
+                }
+                if (quemSaiuEraDaVez) {
+                    iniciarTemporizador(sala);
+                }
+            }
+
+            emitJogadores(sala);
         }
     });
 });
 
-server.listen(PORT, () => {
-    console.log(`Servidor do jogo rodando em http://localhost:${PORT}`);
-});
+function gerarIdSala(tamanho = 6) {
+    const chars = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+    let id = '';
+    for (let i = 0; i < tamanho; i++) {
+        id += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return id;
+}
+
+server.listen(PORT, () => console.log(`🎮 http://localhost:${PORT}`));

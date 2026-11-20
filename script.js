@@ -1,204 +1,222 @@
-const socket = io();
-
-// ==================== PERFIL ====================
-let id_player = null;
-let salaAtual = '';
-let souCriador = false;
-let palavraDefinida = false;
-let jogadoresNaSala = 0;
-let categoriaSala = null;
+const socket = io('http://localhost:3001');
+let meuId = null;
+let souAnfitriao = false;
 let temaEscolhido = null;
-let temaVisualEscolhido = 'classico';
 
 const temas = {
-    animais: { nome: 'Animais' },
-    frutas: { nome: 'Frutas e Alimentos' },
-    paises: { nome: 'Países e Capitais' },
+    animais:    { nome: 'Animais' },
+    frutas:     { nome: 'Frutas' },
+    paises:     { nome: 'Países e Capitais' },
     profissoes: { nome: 'Profissões' },
-    filmes: { nome: 'Filmes e Séries' },
-    objetos: { nome: 'Objetos' },
-    cores: { nome: 'Cores' },
-    esportes: { nome: 'Esportes' },
-    desenhos: { nome: 'Desenhos e Animes' },
-    marcas: { nome: 'Marcas e Empresas' }
+    comidas:    { nome: 'Comidas e Pratos Típicos' },
+    filmes:     { nome: 'Filmes, Séries e Animes' },
+    jogos:      { nome: 'Jogos Eletrônicos e Tabuleiro' },
+    esportes:   { nome: 'Esportes' },
+    objetos:    { nome: 'Objetos do Dia a Dia' },
+    natureza:   { nome: 'Cores, Plantas ou Minerais' }
 };
 
-function atualizarControlesPalpite() {
-    const partidaPronta = palavraDefinida && jogadoresNaSala === 2;
-    document.getElementById('letraInput').disabled = !partidaPronta;
-    document.getElementById('chutarButton').disabled = !partidaPronta;
+function mostrarTela(id) {
+    document.querySelectorAll('.screen').forEach((s) => {
+        if (!s.closest('#roomModal')) {
+            s.style.display = 'none';
+        }
+    });
+    document.getElementById(id).style.display = 'flex';
 }
 
-function atualizarPainelPalavra() {
-    const mostrar = souCriador && !palavraDefinida && !categoriaSala;
-    document.getElementById('definirPalavraBox').style.display = mostrar ? 'flex' : 'none';
+function prepararTelaSala(id, categoria) {
+    document.getElementById('roomModal').style.display = 'none';
+    mostrarTela('gameScreen');
+    document.getElementById('idSalaTela').innerText = id;
+    document.getElementById('temaSalaTela').innerText = categoria;
+    atualizarForca(0);
 }
 
+function atualizarForca(erros) {
+    document.querySelectorAll('.parte-corpo').forEach((parte) => {
+        const nivel = parseInt(parte.getAttribute('data-erro'), 10);
+        parte.classList.toggle('visivel', nivel <= erros);
+    });
+}
+
+socket.on('connect', () => {
+    meuId = socket.id;
+});
+
+// ==================== PERFIL ====================
 function criarPerfil() {
-    const nickname = document.getElementById('nicknameInput').value.trim();
-    if (!nickname) return alert('Digite um apelido!');
-
-    id_player = localStorage.getItem('id_player') || 'p' + Date.now();
-    localStorage.setItem('id_player', id_player);
-    localStorage.setItem('nickname', nickname);
-
+    const apelido = document.getElementById('nicknameInput').value.trim();
+    if (!apelido) return alert('Digite um apelido!');
+    localStorage.setItem('nickname', apelido);
     document.getElementById('profileScreen').style.display = 'none';
     document.getElementById('roomModal').style.display = 'flex';
 }
 
-// ==================== CATEGORIAS E TEMA VISUAL ====================
-function escolherTema(chave) {
-    if (!temas[chave]) return;
-
-    temaEscolhido = chave;
-    document.querySelectorAll('.categoria-btn').forEach((botao) => {
-        botao.classList.remove('selecionado');
-    });
-    document.querySelector(`[data-categoria="${chave}"]`).classList.add('selecionado');
-    document.getElementById('temaEscolhidoLabel').textContent = temas[chave].nome;
-}
-
+// ==================== TEMAS ====================
 function escolherTemaVisual(tema) {
-    temaVisualEscolhido = tema;
-    document.querySelectorAll('.tema-visual-btn').forEach((botao) => {
-        botao.classList.remove('selecionado');
-    });
-    document.querySelector(`[data-tema="${tema}"]`).classList.add('selecionado');
-}
-
-// ==================== SALAS ====================
-function gerarIdSala(tamanho = 6) {
-    const caracteres = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
-    let id = '';
-    for (let i = 0; i < tamanho; i++) {
-        id += caracteres.charAt(Math.floor(Math.random() * caracteres.length));
-    }
-    return id;
-}
-
-function criarSala() {
-    if (!temaEscolhido) return alert('Escolha uma categoria!');
-
-    salaAtual = gerarIdSala();
-    socket.emit('entrarSala', {
-        sala: salaAtual,
-        apelido: localStorage.getItem('nickname'),
-        tema: temaVisualEscolhido,
-        categoria: temaEscolhido,
-        acao: 'criar'
-    });
-}
-
-function entrarSala() {
-    const salaId = document.getElementById('joinRoomInput').value.trim().toUpperCase();
-    if (!salaId) return alert('Digite o ID da sala!');
-
-    salaAtual = salaId;
-    socket.emit('entrarSala', {
-        sala: salaId,
-        apelido: localStorage.getItem('nickname'),
-        tema: null,
-        categoria: null,
-        acao: 'entrar'
-    });
-}
-
-// ==================== EVENTOS DO SERVIDOR ====================
-socket.on('connect', () => console.log('Conectado:', socket.id));
-
-socket.on('aplicarTema', ({ tema }) => {
     document.body.setAttribute('data-tema', tema);
+    document.querySelectorAll('.tema-visual-btn').forEach((b) => b.classList.remove('selecionado'));
+    const botao = document.querySelector(`.tema-visual-btn[data-tema="${tema}"]`);
+    if (botao) botao.classList.add('selecionado');
+}
+
+function escolherTema(chave) {
+    temaEscolhido = chave;
+    document.querySelectorAll('.categoria-btn').forEach((b) => b.classList.remove('selecionado'));
+    const botao = document.querySelector(`.categoria-btn[data-categoria="${chave}"]`);
+    if (botao) botao.classList.add('selecionado');
+    document.getElementById('temaEscolhidoLabel').innerText = temas[chave].nome;
+}
+
+// ==================== CRIAR (ANFITRIÃO) ====================
+function criarSala() {
+    const apelido = localStorage.getItem('nickname') || document.getElementById('nicknameInput').value.trim();
+    if (!apelido) return alert('Digite um apelido primeiro!');
+    if (!temaEscolhido) return alert('Escolha uma categoria de palavras!');
+    const palavra = document.getElementById('palavraSecretaInput').value.trim();
+    if (!palavra) return alert('Digite a palavra secreta!');
+
+    socket.emit('criarSala', {
+        apelido,
+        tema: temaEscolhido,
+        palavra,
+        maxAdivinhadores: parseInt(document.getElementById('maxAdivInput').value, 10)
+    });
+}
+
+socket.on('salaCriada', ({ id, tema, maxAdivinhadores }) => {
+    souAnfitriao = true;
+    prepararTelaSala(id, temas[tema]?.nome || tema);
+    document.getElementById('jogadoresTela').innerText = `Vagas para adivinhadores: ${maxAdivinhadores}`;
+    document.getElementById('btnIniciar').style.display = 'block';
+    document.getElementById('dicaInput').disabled = false;
+    document.getElementById('btnEnviarDica').disabled = false;
+    document.getElementById('statusJogo').innerText = 'Aguardando adivinhadores...';
 });
 
-socket.on('permissaoDefinirPalavra', ({ podeDefinir, palavraDefinida: definida }) => {
-    souCriador = podeDefinir;
-    palavraDefinida = definida;
-    atualizarPainelPalavra();
-    atualizarControlesPalpite();
+// ==================== ENTRAR (ADIVINHADOR) ====================
+function entrarSala() {
+    const apelido = localStorage.getItem('nickname') || document.getElementById('nicknameInput').value.trim();
+    if (!apelido) return alert('Digite um apelido primeiro!');
+    const sala = document.getElementById('joinRoomInput').value.trim().toUpperCase();
+    if (!sala) return alert('Digite o ID da sala!');
+    socket.emit('entrarSala', { sala, apelido });
+}
+
+socket.on('salaEntrou', ({ id, tema }) => {
+    souAnfitriao = false;
+    prepararTelaSala(id, temas[tema]?.nome || tema);
+    document.getElementById('statusJogo').innerText = 'Aguardando o anfitrião iniciar...';
 });
 
-socket.on('palavraDefinida', () => {
-    palavraDefinida = true;
-    document.getElementById('definirPalavraBox').style.display = 'none';
-    document.getElementById('palavraInput').value = '';
-    atualizarControlesPalpite();
-    document.getElementById('statusJogo').textContent = jogadoresNaSala === 2
-        ? 'Palavra definida. A partida pode começar!'
-        : 'Palavra definida. Aguardando oponente.';
+socket.on('jogadoresAtualizados', ({ anfitriao, adivinhadores, faltam }) => {
+    document.getElementById('jogadoresTela').innerText =
+        `Anfitrião: ${anfitriao} | Adivinhadores: ${adivinhadores.join(', ') || 'nenhum ainda'} | Vagas restantes: ${faltam}`;
 });
 
-socket.on('jogadoresAtualizados', (jogadores) => {
-    jogadoresNaSala = jogadores.length;
-    document.getElementById('profileScreen').style.display = 'none';
-    document.getElementById('roomModal').style.display = 'none';
-    document.getElementById('gameScreen').style.display = 'flex';
-    document.getElementById('idSalaTela').textContent = salaAtual;
-    document.getElementById('jogadoresTela').textContent = jogadores.join(' vs ');
-    atualizarControlesPalpite();
-    document.getElementById('statusJogo').textContent = jogadores.length < 2
-        ? `Aguardando oponente... (${jogadores.length}/2)`
-        : palavraDefinida
-            ? 'Partida iniciando...'
-            : 'Aguardando o criador definir a palavra.';
+// ==================== INÍCIO ====================
+socket.on('partidaIniciada', () => {
+    document.getElementById('btnIniciar').style.display = 'none';
+    document.getElementById('statusJogo').innerText = 'Partida iniciada!';
+    atualizarForca(0);
 });
 
-socket.on('salaInfo', ({ id, tema, categoria, jogadores }) => {
-    salaAtual = id;
-    categoriaSala = categoria || tema;
-    document.getElementById('idSalaTela').textContent = id;
-    document.getElementById('temaSalaTela').textContent =
-        temas[categoriaSala] ? temas[categoriaSala].nome : 'Personalizada';
-    document.getElementById('jogadoresTela').textContent = jogadores.join(' vs ');
-    atualizarPainelPalavra();
-});
+function iniciarJogo() {
+    socket.emit('iniciarJogo');
+}
 
-socket.on('salaCheia', () => alert('Esta sala já está cheia.'));
-socket.on('salaNaoEncontrada', () => alert('Sala não encontrada. Confira o ID e tente novamente.'));
-socket.on('erro', (mensagem) => alert(mensagem));
+// ==================== GAMEPLAY ====================
+socket.on('vezDoJogador', ({ id, apelido, tempo }) => {
+    document.getElementById('statusJogo').innerText = `Vez de: ${apelido}`;
+    const ehMinhaVez = id === meuId && !souAnfitriao;
+    document.getElementById('letraInput').disabled = !ehMinhaVez;
+    document.getElementById('chutarButton').disabled = !ehMinhaVez;
 
-socket.on('iniciarPartida', ({ vezDe }) => {
-    document.getElementById('statusJogo').textContent = palavraDefinida
-        ? `Partida iniciada! Vez de ${vezDe}.`
-        : 'Partida pronta. Aguardando o criador definir a palavra.';
-});
-
-socket.on('estadoAtualizado', (estado) => {
-    document.getElementById('statusJogo').textContent =
-        `Erros: ${estado.erros}/6 | Vez de: ${estado.vezDe}`;
-    document.getElementById('letrasUsadas').textContent =
-        estado.letrasUsadas.join(' - ').toUpperCase();
-
-    if (estado.ganhou) {
-        document.getElementById('statusJogo').textContent =
-            `🎉 Vitória! A palavra era: ${estado.palavra}`;
-    } else if (estado.perdeu) {
-        document.getElementById('statusJogo').textContent =
-            `💀 Enforcado! A palavra era: ${estado.palavra}`;
+    if (ehMinhaVez) {
+        document.getElementById('letraInput').focus();
     }
 
-    if (estado.ganhou || estado.perdeu) {
+    let restante = tempo;
+    clearInterval(window._contador);
+    document.getElementById('tempoTela').innerText = `${restante}s`;
+    window._contador = setInterval(() => {
+        restante--;
+        document.getElementById('tempoTela').innerText = `${Math.max(restante, 0)}s`;
+        if (restante <= 0) clearInterval(window._contador);
+    }, 1000);
+});
+
+socket.on('estadoAtualizado', (e) => {
+    document.getElementById('palavraTela').innerText = e.palavraMascarada || '';
+    document.getElementById('errosTela').innerText = `Erros: ${e.erros}/${e.maxErros}`;
+    document.getElementById('letrasUsadas').innerText = e.letrasUsadas.length
+        ? e.letrasUsadas.join(' - ').toUpperCase()
+        : '—';
+
+    atualizarForca(e.erros);
+
+    if (e.ganhou || e.acabou) {
+        clearInterval(window._contador);
         document.getElementById('letraInput').disabled = true;
         document.getElementById('chutarButton').disabled = true;
     }
+
+    if (e.ganhou) {
+        document.getElementById('statusJogo').innerText = `🎉 Adivinharam! Era: ${e.palavra.toUpperCase()}`;
+    } else if (e.acabou) {
+        document.getElementById('statusJogo').innerText = `💀 Enforcados! Era: ${e.palavra.toUpperCase()}`;
+    }
 });
 
-socket.on('oponenteSaiu', () => {
-    document.getElementById('statusJogo').textContent = 'O oponente saiu da sala.';
+socket.on('fimDeTempo', ({ apelido }) => {
+    addDicaNoChat(`⏰ Tempo esgotado de ${apelido}! Contou 1 erro.`);
 });
-
-function definirPalavra() {
-    const input = document.getElementById('palavraInput');
-    const palavra = input.value.trim().toLowerCase();
-    if (!palavra) return alert('Digite uma palavra secreta.');
-
-    socket.emit('definirPalavra', { sala: salaAtual, palavra });
-}
 
 function chutar() {
     const input = document.getElementById('letraInput');
-    const letra = input.value.trim().toLowerCase();
-    if (letra.length !== 1) return alert('Digite uma única letra.');
-
-    socket.emit('chutarLetra', { sala: salaAtual, letra });
+    if (!input.value.trim()) return;
+    socket.emit('chutarLetra', { letra: input.value });
     input.value = '';
 }
+
+// ==================== CHAT DE DICAS ====================
+function enviarDica() {
+    const input = document.getElementById('dicaInput');
+    if (!input.value.trim()) return;
+    socket.emit('enviarDica', { dica: input.value });
+    input.value = '';
+}
+
+socket.on('novaDica', ({ de, texto, hora }) => {
+    addDicaNoChat(`[${hora}] ${de}: ${texto}`);
+});
+
+function addDicaNoChat(msg) {
+    const chat = document.getElementById('chatDicas');
+    const linha = document.createElement('p');
+    linha.innerText = msg;
+    chat.appendChild(linha);
+    chat.scrollTop = chat.scrollHeight;
+}
+
+socket.on('erro', (msg) => alert(msg));
+
+socket.on('salaEncerrada', () => {
+    clearInterval(window._contador);
+    alert('O anfitrião encerrou a sala.');
+    location.reload();
+});
+
+// ==================== ATALHOS COM ENTER ====================
+document.getElementById('nicknameInput').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') criarPerfil();
+});
+
+document.getElementById('letraInput').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') chutar();
+});
+
+document.getElementById('dicaInput').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') enviarDica();
+});
