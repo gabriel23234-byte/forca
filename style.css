@@ -1,46 +1,54 @@
 body[data-tema="classico"] {
-    --bg: #1e1e2e;
-    --primaria: #89b4fa;
-    --texto: #ffffff;
-    --texto-suave: #b4befe;
-    --card: #2a2a3e;
-    --borda: rgba(255, 255, 255, 0.12);
+    --bg: #0f172a;
+    --primaria: #38bdf8;
+    --destaque: #fb923c;
+    --texto: #f8fafc;
+    --texto-suave: #94a3b8;
+    --card: #1e293b;
+    --borda: rgba(148, 163, 184, 0.18);
+    --anel: rgba(56, 189, 248, 0.25);
 }
 
 body[data-tema="halloween"] {
-    --bg: #1a0f0a;
-    --primaria: #ff7518;
-    --texto: #ffd699;
-    --texto-suave: #e09f5a;
-    --card: #2d1a10;
-    --borda: rgba(255, 117, 24, 0.25);
+    --bg: #1c1412;
+    --primaria: #f97316;
+    --destaque: #facc15;
+    --texto: #fff7ed;
+    --texto-suave: #d6b8a3;
+    --card: #2b1f1b;
+    --borda: rgba(249, 115, 22, 0.24);
+    --anel: rgba(249, 115, 22, 0.25);
 }
 
 body[data-tema="neon"] {
-    --bg: #050505;
-    --primaria: #00ffcc;
-    --texto: #e0e0e0;
-    --texto-suave: #7ef9e0;
-    --card: #111111;
-    --borda: rgba(0, 255, 204, 0.25);
+    --bg: #090d0c;
+    --primaria: #10b981;
+    --destaque: #22d3ee;
+    --texto: #ecfdf5;
+    --texto-suave: #86efac;
+    --card: #121a18;
+    --borda: rgba(16, 185, 129, 0.24);
+    --anel: rgba(16, 185, 129, 0.25);
 }
 
 * {
     margin: 0;
     padding: 0;
     box-sizing: border-box;
-    font-family: 'Segoe UI', Arial, sans-serif;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
 }
 
 body {
-    background: var(--bg);
+    background:
+        radial-gradient(circle at top, var(--anel), transparent 55%),
+        var(--bg);
     color: var(--texto);
     min-height: 100vh;
     display: flex;
     justify-content: center;
     align-items: center;
     padding: 16px;
-    transition: background 0.25s ease, color 0.25s ease;
+    transition: background 0.3s ease, color 0.25s ease;
 }
 
 .screen {
@@ -51,64 +59,89 @@ body {
     background: var(--card);
     border: 1px solid var(--borda);
     padding: 28px;
-    border-radius: 16px;
+    border-radius: 18px;
     width: 100%;
     max-width: 460px;
     max-height: 92vh;
     overflow-y: auto;
-    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
 }
 
 .game-card {
-    max-width: 520px;
+    max-width: 540px;
+}
+
+h1 {
+    font-size: 28px;
+    letter-spacing: -0.02em;
+    text-align: center;
+}
+
+h2 {
+    font-size: 20px;
+    letter-spacing: -0.01em;
 }
 
 .subtitulo,
 .info-meta {
-    font-size: 13px;
+    font-size: 13.5px;
     color: var(--texto-suave);
     text-align: center;
+    line-height: 1.4;
 }
 
 .label-secao {
-    font-size: 14px;
+    font-size: 13.5px;
     font-weight: 600;
     align-self: flex-start;
+    color: var(--texto);
 }
 
 input,
 select {
-    padding: 11px 12px;
-    border-radius: 10px;
+    padding: 11px 14px;
+    border-radius: 12px;
     border: 1px solid var(--borda);
-    background: rgba(0, 0, 0, 0.25);
+    background: rgba(0, 0, 0, 0.28);
     color: var(--texto);
     width: 100%;
     font-size: 15px;
     outline: none;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+input::placeholder {
+    color: var(--texto-suave);
+    opacity: 0.7;
 }
 
 input:focus,
 select:focus {
     border-color: var(--primaria);
+    box-shadow: 0 0 0 3px var(--anel);
 }
 
 button {
     background: var(--primaria);
-    color: #111;
+    color: #090d16;
     border: none;
     padding: 11px 18px;
-    border-radius: 10px;
+    border-radius: 12px;
     font-size: 15px;
-    font-weight: bold;
+    font-weight: 700;
     cursor: pointer;
     width: 100%;
-    transition: transform 0.12s ease, opacity 0.15s ease;
+    transition: transform 0.14s ease, opacity 0.18s ease, box-shadow 0.18s ease;
 }
 
 button:hover:not(:disabled) {
-    opacity: 0.9;
+    opacity: 0.95;
     transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25);
+}
+
+button:active:not(:disabled) {
+    transform: translateY(0);
 }
 
 button:disabled {
@@ -122,16 +155,26 @@ button:disabled {
     border: 2px solid var(--primaria);
 }
 
+.btn-secundario:hover:not(:disabled) {
+    background: var(--anel);
+}
+
 /* Modal da sala */
 #roomModal {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.75);
+    background: rgba(0, 0, 0, 0.78);
+    backdrop-filter: blur(4px);
     display: none;
     justify-content: center;
     align-items: center;
     padding: 16px;
     z-index: 20;
+}
+
+.modal-card {
+    padding: 24px;
+    gap: 11px;
 }
 
 .temas {
@@ -143,25 +186,26 @@ button:disabled {
     width: 48px;
     height: 48px;
     padding: 0;
-    border-radius: 12px;
+    border-radius: 14px;
     border: 3px solid transparent;
 }
 
 .tema-visual-btn.selecionado {
-    border-color: #ffffff;
-    transform: scale(1.06);
+    border-color: var(--texto);
+    transform: scale(1.08);
+    box-shadow: 0 0 0 2px var(--primaria);
 }
 
 #temaClassico {
-    background: #89b4fa;
+    background: #38bdf8;
 }
 
 #temaHalloween {
-    background: #ff7518;
+    background: #f97316;
 }
 
 #temaNeon {
-    background: #00ffcc;
+    background: #10b981;
 }
 
 .categorias {
@@ -172,21 +216,31 @@ button:disabled {
 }
 
 .categoria-btn {
-    padding: 9px 8px;
+    padding: 9px 10px;
     font-size: 12.5px;
-    background: rgba(255, 255, 255, 0.07);
+    font-weight: 600;
+    background: rgba(255, 255, 255, 0.05);
     color: var(--texto);
     border: 1px solid var(--borda);
 }
 
+.categoria-btn:hover:not(:disabled) {
+    border-color: var(--primaria);
+}
+
 .categoria-btn.selecionado {
     background: var(--primaria);
-    color: #111;
+    color: #090d16;
     border-color: var(--primaria);
 }
 
 .categoria-atual {
     font-size: 13px;
+    color: var(--texto-suave);
+}
+
+.categoria-atual strong {
+    color: var(--destaque);
 }
 
 .divisor {
@@ -199,7 +253,7 @@ button:disabled {
 
 .divisor span {
     background: var(--card);
-    padding: 0 10px;
+    padding: 0 12px;
     font-size: 12px;
     color: var(--texto-suave);
 }
@@ -211,24 +265,33 @@ button:disabled {
     justify-content: space-between;
     align-items: center;
     gap: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--borda);
 }
 
 .topo-sala .info-meta {
     text-align: left;
 }
 
+#idSalaTela {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    color: var(--primaria);
+    letter-spacing: 1px;
+}
+
 .tempo-box {
-    background: rgba(0, 0, 0, 0.3);
+    background: rgba(0, 0, 0, 0.35);
     border: 1px solid var(--borda);
-    padding: 8px 12px;
-    border-radius: 10px;
-    font-weight: bold;
+    padding: 8px 14px;
+    border-radius: 12px;
+    font-weight: 700;
     font-size: 15px;
+    color: var(--destaque);
     white-space: nowrap;
 }
 
 #statusJogo {
-    font-size: 16px;
+    font-size: 15.5px;
     font-weight: 600;
     min-height: 24px;
     text-align: center;
@@ -239,7 +302,16 @@ button:disabled {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 4px;
+    gap: 6px;
+    padding: 8px 16px;
+    border-radius: 14px;
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid var(--borda);
+}
+
+#forcaSvg {
+    max-width: 100%;
+    height: auto;
 }
 
 .forca-estrutura {
@@ -255,28 +327,31 @@ button:disabled {
     stroke-linecap: round;
     fill: none;
     opacity: 0;
-    transition: opacity 0.2s ease;
+    transition: opacity 0.22s ease;
 }
 
 .parte-corpo.visivel {
     opacity: 1;
+    filter: drop-shadow(0 0 6px var(--anel));
 }
 
 #errosTela {
     font-size: 13px;
+    font-weight: 600;
     color: var(--texto-suave);
 }
 
 #palavraTela {
     font-size: 28px;
-    font-weight: bold;
+    font-weight: 800;
     letter-spacing: 5px;
     text-align: center;
     text-transform: uppercase;
     word-break: break-word;
-    padding: 8px 12px;
-    border-radius: 10px;
-    background: rgba(0, 0, 0, 0.22);
+    padding: 12px 14px;
+    border-radius: 12px;
+    background: rgba(0, 0, 0, 0.28);
+    border: 1px solid var(--borda);
     width: 100%;
 }
 
@@ -287,14 +362,15 @@ button:disabled {
 }
 
 #letraInput {
-    width: 72px;
+    width: 74px;
     text-align: center;
     text-transform: uppercase;
-    font-weight: bold;
+    font-weight: 800;
 }
 
 #chutarButton {
     width: auto;
+    min-width: 110px;
 }
 
 .letras-box {
@@ -306,25 +382,28 @@ button:disabled {
 
 #letrasUsadas {
     margin-top: 4px;
-    font-weight: 600;
+    font-weight: 700;
     color: var(--texto);
     min-height: 18px;
 }
 
 #chatDicas {
+    display: flex;
+    flex-direction: column;
     width: 100%;
-    min-height: 64px;
-    max-height: 130px;
+    min-height: 68px;
+    max-height: 135px;
     overflow-y: auto;
-    background: rgba(0, 0, 0, 0.3);
+    background: rgba(0, 0, 0, 0.32);
     border: 1px solid var(--borda);
-    padding: 10px;
-    border-radius: 10px;
+    padding: 10px 12px;
+    border-radius: 12px;
     font-size: 13px;
 }
 
 #chatDicas p {
-    margin-bottom: 5px;
+    margin-bottom: 6px;
+    line-height: 1.35;
 }
 
 #chatDicas p:last-child {
@@ -339,16 +418,17 @@ button:disabled {
 
 #btnEnviarDica {
     width: auto;
+    min-width: 90px;
 }
 
 .fim-partida-box {
-    width: 100%;
     display: none;
+    width: 100%;
     flex-direction: column;
     gap: 10px;
-    padding: 12px;
-    border-radius: 12px;
-    background: rgba(0, 0, 0, 0.25);
+    padding: 14px;
+    border-radius: 14px;
+    background: rgba(0, 0, 0, 0.3);
     border: 1px solid var(--borda);
 }
 
@@ -359,6 +439,45 @@ button:disabled {
 }
 
 .btn-perigo {
-    background: #e5484d;
+    background: #ef4444;
     color: #ffffff;
+}
+
+@media (max-width: 480px) {
+    .screen {
+        padding: 20px;
+        border-radius: 14px;
+    }
+
+    #palavraTela {
+        font-size: 22px;
+        letter-spacing: 3px;
+    }
+
+    .acoes-fim {
+        flex-direction: column;
+    }
+}
+
+.card-resultado {
+    width: 100%;
+    padding: 12px 14px;
+    border-radius: 12px;
+    font-size: 14.5px;
+    font-weight: 700;
+    text-align: center;
+    line-height: 1.35;
+    border: 1px solid transparent;
+}
+
+.card-resultado.vitoria {
+    background: rgba(34, 197, 94, 0.18);
+    border-color: #22c55e;
+    color: #86efac;
+}
+
+.card-resultado.derrota {
+    background: rgba(239, 68, 68, 0.18);
+    border-color: #ef4444;
+    color: #fca5a5;
 }

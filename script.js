@@ -121,6 +121,9 @@ socket.on('partidaIniciada', () => {
     document.getElementById('fimPartidaBox').style.display = 'none';
     document.getElementById('tempoTela').innerText = '15s';
     document.getElementById('statusJogo').innerText = 'Partida iniciada!';
+    document.getElementById('areaFimAdivinhador').style.display = 'none';
+    document.getElementById('cardResultadoAdivinhador').style.display = 'none';
+    document.getElementById('cardResultadoAdivinhador').classList.remove('vitoria', 'derrota');
     atualizarForca(0);
 });
 
@@ -154,6 +157,9 @@ socket.on('rodadaPreparada', ({ tema, anfitriao, adivinhadores, faltam }) => {
     document.getElementById('fimPartidaBox').style.display = 'none';
     document.getElementById('letraInput').disabled = true;
     document.getElementById('chutarButton').disabled = true;
+    document.getElementById('areaFimAdivinhador').style.display = 'none';
+    document.getElementById('cardResultadoAdivinhador').style.display = 'none';
+    document.getElementById('cardResultadoAdivinhador').classList.remove('vitoria', 'derrota');
     atualizarForca(0);
 
     if (souAnfitriao) {
@@ -201,7 +207,8 @@ socket.on('estadoAtualizado', (e) => {
 
     const fimBox = document.getElementById('fimPartidaBox');
     const controlesHost = document.getElementById('controlesAnfitriaoFim');
-    const avisoGuest = document.getElementById('avisoFimAdivinhador');
+    const areaGuest = document.getElementById('areaFimAdivinhador');
+    const cardResultado = document.getElementById('cardResultadoAdivinhador');
 
     if (e.ganhou || e.acabou) {
         clearInterval(window._contador);
@@ -209,24 +216,32 @@ socket.on('estadoAtualizado', (e) => {
         document.getElementById('chutarButton').disabled = true;
 
         fimBox.style.display = 'flex';
+
         if (souAnfitriao) {
             controlesHost.style.display = 'flex';
-            avisoGuest.style.display = 'none';
-            document.getElementById('novaPalavraInput').focus();
+            areaGuest.style.display = 'none';
+            cardResultado.style.display = 'none';
+            document.getElementById('novaPalavraInput')?.focus();
         } else {
             controlesHost.style.display = 'none';
-            avisoGuest.style.display = 'block';
+            areaGuest.style.display = 'flex';
+            cardResultado.style.display = 'block';
+            cardResultado.classList.remove('vitoria', 'derrota');
+
+            if (e.ganhou) {
+                cardResultado.classList.add('vitoria');
+                cardResultado.innerText = `🎉 Vocês venceram! A palavra era: ${e.palavra.toUpperCase()}`;
+            } else {
+                cardResultado.classList.add('derrota');
+                cardResultado.innerText = `💀 Vocês perderam! A palavra era: ${e.palavra.toUpperCase()}`;
+            }
         }
     } else {
         fimBox.style.display = 'none';
         controlesHost.style.display = 'none';
-        avisoGuest.style.display = 'none';
-    }
-
-    if (e.ganhou) {
-        document.getElementById('statusJogo').innerText = `🎉 Adivinharam! Era: ${e.palavra.toUpperCase()}`;
-    } else if (e.acabou) {
-        document.getElementById('statusJogo').innerText = `💀 Enforcados! Era: ${e.palavra.toUpperCase()}`;
+        areaGuest.style.display = 'none';
+        cardResultado.style.display = 'none';
+        cardResultado.classList.remove('vitoria', 'derrota');
     }
 });
 
@@ -280,8 +295,8 @@ document.getElementById('letraInput').addEventListener('keydown', (e) => {
 
 document.getElementById('dicaInput').addEventListener('keydown', (e) => {
     if (e.key === 'Enter') enviarDica();
+});
 
-    document.getElementById('novaPalavraInput')?.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') prepararNovaRodada();
-    });
+document.getElementById('novaPalavraInput')?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') prepararNovaRodada();
 });
